@@ -16,14 +16,15 @@ HANDLE serialHandle;
 
 char block[128];
 char sign;
-int counter;
+int blockNumber;
+int inverseBlockNumber;
+char sum[2];
 int code;
 unsigned long sizeSign = sizeof(sign);
-ifstream file;
 
 bool openPort(string port);
 int calcCrc(char* ptr, int count);
-void receive();
+void receive(string nameFile);
 void send();
 
 int main() {
@@ -69,16 +70,13 @@ int main() {
 		// Jakas funkcja odbierajca
 		// Jednak wstrzymajmy sie z ta funkcja
 
-		file.open(nameFile, ios::binary);
-		receive();
+		receive(nameFile);
 		/*while (!file.eof()) {
 			ReadFile(serialHandle, &sign, counter, &sizeSign, NULL);
 		}*/
 		break;
 	case 2:
 		// Jakas funkcja andajaca
-
-		file.open (nameFile, ios::binary);
 		send();
 
 		break;
@@ -87,7 +85,6 @@ int main() {
 		return 0;
 	}
 
-	file.close();
 	CloseHandle(serialHandle);
 }
 
@@ -143,25 +140,26 @@ int calcCrc(char* ptr, int count) {
 	return crc;
 }
 
-void receive() {
-	cout << "Czy chcesz odebrac? 1 - ACK, 2 - NAK" << endl;
-	int choice;
+void receive(string nameFile) {
+	cout << "Wybierz tryb odbiornika:\n 1 - C (liczenie 16-bitowej sumy CRC)\n 2 - NAK (liczenie standardowej 8-bitowej sumy kontrolnej)" << endl;
+	int mode;
 
-	cin >> choice;
+	cin >> mode;
 
-	switch (choice) {
+	switch (mode) {
 	case 1:
-		sign = ACK;
+		sign = C;
 		break;
 	case 2:
 		sign = NAK;
 		break;
 	default:
+		mode = 2;
 		sign = NAK;
 		break;
 	}
 
-	bool transmition = true;
+	bool transmition = false;
 
 	for (int i = 0; i < 6; i++) {
 		WriteFile(serialHandle, &sign, 1, &sizeSign, NULL);
@@ -169,12 +167,40 @@ void receive() {
 		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
 
 		if (sign == SOH) {
-			transmition = false;
+			transmition = true;
 			cout << "Ustawiono polaczenie" << endl;
 			break;
 		}                    
 	}
-	if (transmition) { exit(1);}
+	if (!transmition) { 
+		cout << "Polaczenie nie zostalo nawiazane" << endl;
+		exit(1); 
+	}
+
+	ifstream file;
+	file.open(nameFile, ios::binary);
+
+	ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+	blockNumber = (int)sign;
+
+	ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+	inverseBlockNumber = (int)sign;
+
+	for (int i = 0; i < 128; i++) {
+		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+		block[i] = sign;
+	}
+
+	if (1 == mode)	{
+		// trzeba policzyæ i sprawdziæ CRC
+	} else /* mode == 2*/ {
+		// trzeba policzyæ i sprawdziæ sumê kontroln¹
+		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+		sum[0] = sign;
+		sum[1] = 0;
+	}
+
+	file.close();
 }
 
 void send() {
