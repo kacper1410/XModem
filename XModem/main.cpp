@@ -5,12 +5,12 @@
 
 using namespace std;
 
-const char SOH = 0x1;
-const char EOT = 0x4;
-const char ACK = 0x6;
-const char NAK = 0x15;
-const char CAN = 0x18;
-const char C = 0x43;
+const char SOH = (char)1;
+const char EOT = (char)4;
+const char ACK = (char)6;
+const char NAK = (char)15;
+const char CAN = (char)18;
+const char C = (char)43;
 
 HANDLE serialHandle;
 
@@ -19,13 +19,15 @@ char sign;
 int blockNumber;
 int inverseBlockNumber;
 char sum[2];
-int code;
+int mode;
 unsigned long sizeSign = sizeof(sign);
 
 bool openPort(string port);
 int calcCrc(char* ptr, int count);
+char calcChecksum(char tab[]);
 void receive(string nameFile);
-void send();
+void send(string nameFile);
+void fill(char tab[]);
 
 int main() {
 	// Proponuje, zeby w programie mozna bylo wybrac czy chcesz nadawac czy odbierac
@@ -68,16 +70,12 @@ int main() {
 	switch (choice) {
 	case 1:
 		// Jakas funkcja odbierajca
-		// Jednak wstrzymajmy sie z ta funkcja
 
 		receive(nameFile);
-		/*while (!file.eof()) {
-			ReadFile(serialHandle, &sign, counter, &sizeSign, NULL);
-		}*/
 		break;
 	case 2:
-		// Jakas funkcja andajaca
-		send();
+		// Jakas funkcja nadajaca
+		send(nameFile);
 
 		break;
 	default:
@@ -140,9 +138,18 @@ int calcCrc(char* ptr, int count) {
 	return crc;
 }
 
+char calcChecksum(char tab[]) {
+	char checksum = (char)26;
+
+	for (int i = 0; i < 128; i++) {
+		checksum += tab[i] % 256;
+	}
+
+	return checksum;
+}
+
 void receive(string nameFile) {
 	cout << "Wybierz tryb odbiornika:\n 1 - C (liczenie 16-bitowej sumy CRC)\n 2 - NAK (liczenie standardowej 8-bitowej sumy kontrolnej)" << endl;
-	int mode;
 
 	cin >> mode;
 
@@ -192,6 +199,7 @@ void receive(string nameFile) {
 	}
 
 	if (1 == mode)	{
+		
 		// trzeba policzyæ i sprawdziæ CRC
 	} else /* mode == 2*/ {
 		// trzeba policzyæ i sprawdziæ sumê kontroln¹
@@ -203,25 +211,107 @@ void receive(string nameFile) {
 	file.close();
 }
 
-void send() {
+void send(string nameFile) {
 	bool transmition = false;
 
 	for (int i = 0; i < 6; i++) {
 		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
 
-		if (sign == ACK) {
-			cout << "ACK" << endl;
-			transmition = true;
+		if (C == sign) {
+			cout << "C" << endl;
+			mode = 1;
 			break;
 		}
-		else if (sign == NAK) {
+		else if (NAK == sign) {
 			cout << "NAK" << endl;
-			transmition = true;
+			mode = 2;
 			break;
+		}
+
+		if (5 == i) {
+			exit(1);
 		}
 	}
 
-	if (!transmition) { exit(1);}
+	ifstream file;
+	file.open(nameFile, ios::binary);
 
+	bool isGitarson;
 
+	while (!file.eof()) {
+		fill(block);
+
+		for (int i = 0; i < 128 && !file.eof(); i++) {
+			block[i] = file.get();
+		}
+
+		bool isCorrcet = false;
+
+		while (!isCorrcet) {
+			// Start of Header
+			WriteFile(serialHandle, &SOH, 1, &sizeSign, NULL);
+
+			// Packet Number
+			sign = (char)blockNumber;
+			WriteFile(serialHandle, &sign, 1, &sizeSign, NULL);
+
+			// (Packet Number) innverse block number
+			inverseBlockNumber = 255 - blockNumber;
+			sign = (char)inverseBlockNumber;
+			WriteFile(serialHandle, &sign, 1, &sizeSign, NULL);
+
+			// Packet Data
+			for (int i = 0; i < 128; i++) {
+				WriteFile(serialHandle, &block[i], 1, &sizeSign, NULL);
+			}
+
+			// Crc
+			if (1 == mode) {
+				//TODO
+				// Crc 
+			}
+			else /* 2 == mode */ {
+				char checksum = calcChecksum(block);
+				WriteFile(serialHandle, &checksum, 1, &sizeSign, NULL);
+			}
+
+			while (true) {
+				sign = (char)0;
+				ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+
+				if (ACK == sign) {
+					isCorrcet = true;
+					cout << "Przeslano (ACK)" << endl;
+					break;
+				}
+				else if (NAK == sign) {
+					cout << "Wysylanie pakietu ponownie (NAK)" << endl;
+					break;
+				}
+				else if (CAN == sign) {
+					cout << "Anulowano przesylanie" << endl;
+					exit(1);
+				}
+			}
+		}
+
+		if (255 == blockNumber) {
+			blockNumber = 1;
+		}
+		else {
+			blockNumber++;
+		}
+	}
+
+	do {
+		sign = EOT;
+		WriteFile(serialHandle, &sign, 1, &sizeSign, NULL);
+		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+	} while (ACK != sign);
+}
+
+void fill(char tab[]) {
+	for (int i = 0; i < 128; i++) {
+		tab[i] = (char)26;
+	}
 }
