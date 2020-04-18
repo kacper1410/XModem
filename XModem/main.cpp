@@ -69,9 +69,8 @@ int main() {
 		// Jakas funkcja odbierajca
 		// Jednak wstrzymajmy sie z ta funkcja
 
-		//file.open(nameFile, ios::binary);
+		file.open(nameFile, ios::binary);
 		receive();
-
 		/*while (!file.eof()) {
 			ReadFile(serialHandle, &sign, counter, &sizeSign, NULL);
 		}*/
@@ -79,8 +78,9 @@ int main() {
 	case 2:
 		// Jakas funkcja andajaca
 
-		//file.open (nameFile, ios::binary);
+		file.open (nameFile, ios::binary);
 		send();
+
 		break;
 	default:
 		cout << "Nie wybrales nic!" << endl;
@@ -88,6 +88,7 @@ int main() {
 	}
 
 	file.close();
+	CloseHandle(serialHandle);
 }
 
 
@@ -173,7 +174,7 @@ void receive() {
 			break;
 		}                    
 	}
-	if (transmition) { exit(1); }
+	if (transmition) { exit(1);}
 }
 
 void send() {
@@ -189,9 +190,12 @@ void send() {
 		}
 		else if (sign == NAK) {
 			cout << "NAK" << endl;
+			transmition = true;
 			break;
 		}
 	}
 
-	if (!transmition) { exit(1); }
+	if (!transmition) { exit(1);}
+
+
 }
