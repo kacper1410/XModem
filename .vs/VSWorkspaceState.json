@@ -1,7 +1,8 @@
 {
   "ExpandedNodes": [
     "",
-    "\\XModem"
+    "\\XModem",
+    "\\XModem\\Debug"
   ],
   "SelectedNode": "\\XModem\\main.cpp",
   "PreviewInSolutionExplorer": false
