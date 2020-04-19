@@ -1,3 +1,4 @@
 ﻿  main.cpp
-C:\Users\student\Desktop\repos\XModem\XModem\main.cpp(352,7): warning C4101: 'isGitarson': unreferenced local variable
+C:\Users\student\Desktop\repos\XModem\XModem\main.cpp(237,7): warning C4101: 'isGitarson': unreferenced local variable
+C:\Users\student\Desktop\repos\XModem\XModem\main.cpp(142): warning C4172: returning address of local variable or temporary: tab
   XModem.vcxproj -> C:\Users\student\Desktop\repos\XModem\x64\Debug\XModem.exe
