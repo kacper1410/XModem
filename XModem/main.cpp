@@ -16,8 +16,8 @@ HANDLE serialHandle;
 
 char block[128];
 char sign;
-int blockNumber;
-int inverseBlockNumber;
+int blockNumber = 1;
+char inverseBlockNumber;
 char sum[2];
 int mode;
 unsigned long sizeSign = sizeof(sign);
@@ -142,7 +142,8 @@ char calcChecksum(char tab[]) {
 	char checksum = (char)26;
 
 	for (int i = 0; i < 128; i++) {
-		checksum += tab[i] % 256;
+		checksum += tab[i];
+		checksum = checksum % 256;
 	}
 
 	return checksum;
@@ -161,6 +162,7 @@ void receive(string nameFile) {
 		sign = NAK;
 		break;
 	default:
+		cout << "Nie wybrano poprawnej opcji, wybor domyslny to 2" << endl; 
 		mode = 2;
 		sign = NAK;
 		break;
@@ -177,38 +179,149 @@ void receive(string nameFile) {
 			transmition = true;
 			cout << "Ustawiono polaczenie" << endl;
 			break;
-		}                    
-	}
-	if (!transmition) { 
-		cout << "Polaczenie nie zostalo nawiazane" << endl;
-		exit(1); 
+		}       
+		if (5 == i) {
+			cout << "Polaczenie nie zostalo nawiazane" << endl;
+			exit(1);
+		}
 	}
 
-	ifstream file;
+	ofstream file;
 	file.open(nameFile, ios::binary);
 
+	// Odbieranie nr bloku
 	ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
 	blockNumber = (int)sign;
 
+	// Odbieranie dope³nienia do nr bloku
 	ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
-	inverseBlockNumber = (int)sign;
+	inverseBlockNumber = sign;
+	//		cout << "Otrzymano dopelnienie numeru: " << (int)sign << endl;
 
+			// Odbieranie danych
 	for (int i = 0; i < 128; i++) {
 		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
 		block[i] = sign;
 	}
 
-	if (1 == mode)	{
-		
-		// trzeba policzyæ i sprawdziæ CRC
-	} else /* mode == 2*/ {
-		// trzeba policzyæ i sprawdziæ sumê kontroln¹
+	// Odbieranie sumy kontrolnej
+	if (1 == mode) {
+		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+		sum[0] = sign;
+		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+		sum[1] = sign;
+	}
+	else /* mode == 2*/ {
 		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
 		sum[0] = sign;
 		sum[1] = 0;
 	}
 
+	bool isCorrect = true;
+
+	// Sprawdzanie czy numer bloku siê zgadza
+	if ((char)(255 - blockNumber) != inverseBlockNumber) {
+		cout << "Niepoprawny numer bloku" << endl;
+		cout << "Podany numer: " << blockNumber << ". Podane dopelnienie: " << inverseBlockNumber << endl;
+		isCorrect = false;
+	}
+
+	// Sprawdzanie czy suma kontrolna siê zgadza
+	if (1 == mode) {
+		// to do, liczenie sumy CRC
+	}
+	else {
+		if (sum[0] != calcChecksum(block)) {
+			cout << "Niepoprawna suma kontrolna" << endl;
+			isCorrect = false;
+		}
+	}
+
+	// Wysy³anie ACK lub NAK w zale¿noœci od poprawnoœci
+	if (isCorrect) {
+		WriteFile(serialHandle, &ACK, 1, &sizeSign, NULL);
+		cout << "Pakiet nr " << blockNumber << " odebrany poprawnie" << endl;
+		for (int i = 0; i < 128; i++) {
+			if (block[i] != 26) {
+				file << block[i];
+			}
+		}
+	}
+	else {
+		WriteFile(serialHandle, &NAK, 1, &sizeSign, NULL);
+	}
+
+	while (true) {
+		// Jeœli SOH to kontynuuje, jeœli EOT lub CAN koñczy po³¹czenie
+		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+		if (sign == EOT || sign == CAN)
+			break;
+		// Odbieranie nr bloku
+		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+		blockNumber = (int)sign;
+
+		// Odbieranie dope³nienia do nr bloku
+		ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+		inverseBlockNumber = sign;
+//		cout << "Otrzymano dopelnienie numeru: " << (int)sign << endl;
+
+		// Odbieranie danych
+		for (int i = 0; i < 128; i++) {
+			ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+			block[i] = sign;
+		}
+
+		// Odbieranie sumy kontrolnej
+		if (1 == mode) {
+			ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+			sum[0] = sign;
+			ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+			sum[1] = sign;
+		}
+		else /* mode == 2*/ {
+			ReadFile(serialHandle, &sign, 1, &sizeSign, NULL);
+			sum[0] = sign;
+			sum[1] = 0;
+		}
+
+		bool isCorrect = true;
+
+		// Sprawdzanie czy numer bloku siê zgadza
+		if ((char)(255 - blockNumber) != inverseBlockNumber) {
+			cout << "Niepoprawny numer bloku" << endl;
+			cout << "Podany numer: " << blockNumber << ". Podane dopelnienie: " << inverseBlockNumber << endl;
+			isCorrect = false;
+		}
+
+		// Sprawdzanie czy suma kontrolna siê zgadza
+		if (1 == mode) {
+			// to do, liczenie sumy CRC
+		}
+		else {
+			if (sum[0] != calcChecksum(block)) {
+				cout << "Niepoprawna suma kontrolna" << endl;
+				isCorrect = false;
+			}
+		}
+
+		// Wysy³anie ACK lub NAK w zale¿noœci od poprawnoœci
+		if (isCorrect) {
+			WriteFile(serialHandle, &ACK, 1, &sizeSign, NULL);
+			cout << "Pakiet nr " << blockNumber << " odebrany poprawnie" << endl;
+			for (int i = 0; i < 128; i++) {
+				if (block[i] != 26) {
+					file << block[i];
+				}
+			}
+		}
+		else {
+			WriteFile(serialHandle, &NAK, 1, &sizeSign, NULL);
+		}
+
+
+	}
 	file.close();
+	system("pause");
 }
 
 void send(string nameFile) {
@@ -254,11 +367,13 @@ void send(string nameFile) {
 			// Packet Number
 			sign = (char)blockNumber;
 			WriteFile(serialHandle, &sign, 1, &sizeSign, NULL);
+			cout << "Wyslano numer bloku: " << blockNumber << endl;
 
 			// (Packet Number) innverse block number
-			inverseBlockNumber = 255 - blockNumber;
-			sign = (char)inverseBlockNumber;
+			inverseBlockNumber = (char)255 - blockNumber;
+			sign = inverseBlockNumber;
 			WriteFile(serialHandle, &sign, 1, &sizeSign, NULL);
+			cout << "Wyslano dopelnienie numeru: " << sign << endl;
 
 			// Packet Data
 			for (int i = 0; i < 128; i++) {

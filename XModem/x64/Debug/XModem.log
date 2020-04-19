@@ -1,2 +1,3 @@
 ﻿  main.cpp
-  XModem.vcxproj -> D:\source\repos\XModem\x64\Debug\XModem.exe
+C:\Users\student\Desktop\repos\XModem\XModem\main.cpp(352,7): warning C4101: 'isGitarson': unreferenced local variable
+  XModem.vcxproj -> C:\Users\student\Desktop\repos\XModem\x64\Debug\XModem.exe
